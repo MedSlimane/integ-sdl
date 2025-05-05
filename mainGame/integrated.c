@@ -845,6 +845,9 @@ void jouerModeDuo(SDL_Surface *screen) {
     // Variables pour les objets bonus (coeurs)
     Coeur coeurs1[8], coeurs2[8]; // Bonus pour chaque joueur
     
+    // Variables pour la minicarte
+    Minimap minimap1, minimap2;
+    
     // Variables pour le temps
     Uint32 lastTime = SDL_GetTicks();
     Uint32 currentTime;
@@ -874,6 +877,14 @@ void jouerModeDuo(SDL_Surface *screen) {
     // Initialisation des objets bonus pour les deux joueurs
     initCoeurs(coeurs1, "ES2/bonus");
     initCoeurs(coeurs2, "ES2/bonus");
+    
+    // Initialisation des minicartes
+    initMinimap(&minimap1, screen->w / 2, screen->h);  // Pour l'écran gauche
+    initMinimap(&minimap2, screen->w / 2, screen->h);  // Pour l'écran droit
+    
+    // Ajustement des positions des minicartes pour chaque moitié de l'écran
+    minimap1.position.x = (screen->w / 2) - MINIMAP_WIDTH - MINIMAP_PADDING;
+    minimap2.position.x = screen->w - MINIMAP_WIDTH - MINIMAP_PADDING;
     
     // Boucle principale du jeu
     int running = 1;
@@ -1037,6 +1048,10 @@ void jouerModeDuo(SDL_Surface *screen) {
         // Affichage des objets bonus pour joueur 1
         afficherCoeurs(coeurs1, screen, bgX1, bgY1);
         
+        // Mise à jour et affichage de la minicarte pour joueur 1
+        updateMinimap(&minimap1, &background1, perso1, bgX1, bgY1);
+        afficherMinimap(minimap1, screen);
+        
         // Affichage du joueur 1
         // Ajuster les coordonnées du texte pour l'écran gauche
         int scoreX = perso1.score.postext.x;
@@ -1070,6 +1085,10 @@ void jouerModeDuo(SDL_Surface *screen) {
         
         // Affichage des objets bonus pour joueur 2
         afficherCoeurs(coeurs2, screen, bgX2, bgY2);
+        
+        // Mise à jour et affichage de la minicarte pour joueur 2
+        updateMinimap(&minimap2, &background2, perso2, bgX2, bgY2);
+        afficherMinimap(minimap2, screen);
         
         // Affichage du joueur 2
         // Ajuster les coordonnées du texte pour l'écran droit
@@ -1123,6 +1142,10 @@ void jouerModeDuo(SDL_Surface *screen) {
     // Libération des ressources
     SDL_FreeSurface(background1.img);
     SDL_FreeSurface(background2.img);
+    
+    // Libération des minicartes
+    freeMinimap(&minimap1);
+    freeMinimap(&minimap2);
     
     // Libération des ennemis
     for (int i = 0; i < nbEnnemis; i++) {
