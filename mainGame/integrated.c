@@ -658,10 +658,83 @@ void jouerModeSolo(SDL_Surface *screen) {
                     // Perte de vie si collision avec un ennemi
                     if (perso.nbcoeur > 0) {
                         perso.nbcoeur--;
-                        // Désactiver l'ennemi temporairement pour éviter des collisions multiples
-                        ennemis[i].active = 0;
-                        // Utiliser lastFrameTime comme indicateur de quand réactiver
-                        ennemis[i].lastFrameTime = SDL_GetTicks() + 2000; // Réactiver dans 2 secondes
+                        // Ne pas désactiver l'ennemi temporairement lors de la première collision (tant que le joueur a encore des vies)
+                        // Modification: garder l'ennemi actif si le joueur a encore des vies après cette collision
+                        if (perso.nbcoeur == 0) {
+                            // Si le joueur n'a plus de vies, lancer l'énigme
+                            // Montrer un message indiquant qu'une énigme va commencer
+                            SDL_Surface *messageText;
+                            TTF_Font *messageFont = TTF_OpenFont("enigme/arial.ttf", 24);
+                            if (!messageFont) {
+                                messageFont = TTF_OpenFont("img/arial.ttf", 24);
+                            }
+                            
+                            if (messageFont) {
+                                SDL_Color textColor = {255, 255, 255};
+                                messageText = TTF_RenderText_Blended(messageFont, "Vous avez perdu toutes vos vies! Résolvez l'énigme pour continuer...", textColor);
+                                
+                                SDL_Rect messagePosition = {
+                                    (screen->w - messageText->w) / 2,
+                                    (screen->h - messageText->h) / 2,
+                                    0, 0
+                                };
+                                
+                                // Afficher le fond et le message
+                                SDL_FillRect(screen, NULL, SDL_MapRGB(screen->format, 0, 0, 0));
+                                SDL_BlitSurface(messageText, NULL, screen, &messagePosition);
+                                SDL_Flip(screen);
+                                SDL_Delay(3000);
+                                
+                                // Libérer les ressources
+                                SDL_FreeSurface(messageText);
+                                TTF_CloseFont(messageFont);
+                            }
+                            
+                            // Lancer l'énigme
+                            int enigmeResult = jouerEnigme(screen);
+                            
+                            if (enigmeResult) {
+                                // Si l'énigme est réussie, restaurer les vies du joueur et désactiver l'ennemi
+                                perso.nbcoeur = 3;
+                                
+                                // Désactiver l'ennemi (collision) mais garder le visuel de l'ennemi
+                                // Déplacer l'ennemi hors de l'écran sans désactiver l'ennemi
+                                ennemis[i].pos.x = -1000; 
+                                ennemis[i].pos.y = -1000;
+                                
+                                // Laisser l'ennemi actif pour l'affichage mais le déplacer hors écran
+                                // Ne pas désactiver l'ennemi pour éviter les problèmes d'affichage
+                                // ennemis[i].active = 0; - ON SUPPRIME CETTE LIGNE
+                                
+                                // Forcer une mise à jour de l'affichage pour montrer les changements
+                                // Redessiner l'écran avant de continuer
+                                afficherPerso(perso, screen);
+                                SDL_Flip(screen);
+                            } else {
+                                // Si l'énigme échoue, game over
+                                if (messageFont) {
+                                    SDL_Color textColor = {255, 0, 0};
+                                    messageText = TTF_RenderText_Blended(messageFont, "Game Over! Vous avez échoué à l'énigme.", textColor);
+                                    
+                                    SDL_Rect messagePosition = {
+                                        (screen->w - messageText->w) / 2,
+                                        (screen->h - messageText->h) / 2,
+                                        0, 0
+                                    };
+                                    
+                                    // Afficher le fond et le message
+                                    SDL_FillRect(screen, NULL, SDL_MapRGB(screen->format, 0, 0, 0));
+                                    SDL_BlitSurface(messageText, NULL, screen, &messagePosition);
+                                    SDL_Flip(screen);
+                                    SDL_Delay(3000);
+                                    
+                                    // Libérer les ressources
+                                    SDL_FreeSurface(messageText);
+                                }
+                                
+                                running = 0; // Fin du jeu
+                            }
+                        }
                     }
                 }
             } else {
@@ -1183,4 +1256,710 @@ int collisionCoeur(Personne p, Coeur coeur) {
     } else {
         return 0; // Pas de collision
     }
+}
+
+// Initialisation du menu des paramètres
+void initSettingsMenu(SettingsMenu *menu) {
+    // Initialisation des valeurs par défaut
+    menu->volume = 64;  // Volume par défaut à 50%
+    menu->is_fullscreen = 0;
+    menu->textColor.r = 255;
+    menu->textColor.g = 255;
+    menu->textColor.b = 255;
+
+    // Chargement des images pour les boutons
+    menu->background = IMG_Load("img/background.jpeg");
+    menu->fullscreen_background = IMG_Load("img/fullscreen_background.jpeg");
+    
+    // S'il n'y a pas de fond spécifique, utiliser une couleur par défaut
+    if (!menu->background) {
+        menu->background = SDL_CreateRGBSurface(SDL_SWSURFACE, 1500, 800, 32, 0, 0, 0, 0);
+        SDL_FillRect(menu->background, NULL, SDL_MapRGB(menu->background->format, 50, 50, 100)); // Fond bleu foncé
+    }
+    if (!menu->fullscreen_background) {
+        menu->fullscreen_background = SDL_CreateRGBSurface(SDL_SWSURFACE, 1920, 1080, 32, 0, 0, 0, 0);
+        SDL_FillRect(menu->fullscreen_background, NULL, SDL_MapRGB(menu->fullscreen_background->format, 50, 50, 100)); // Fond bleu foncé
+    }
+
+    // Chargement des boutons avec gestion des erreurs
+    menu->button_diminuer = IMG_Load("img/diminuer.png");
+    menu->button_diminuer_hovered = IMG_Load("img/diminuer2.png");
+    menu->button_augmenter = IMG_Load("img/augmenter.png");
+    menu->button_augmenter_hovered = IMG_Load("img/augmenter2.png");
+    menu->button_plein_ecran = IMG_Load("img/plein_ecran.png");
+    menu->button_plein_ecran_hovered = IMG_Load("img/plein_ecran2.png");
+    menu->button_normal = IMG_Load("img/normal.png");
+    menu->button_normal_hovered = IMG_Load("img/normal2.png");
+    menu->button_retour = IMG_Load("img/retour.png");
+    menu->button_retour_hovered = IMG_Load("img/retour2.png");
+
+    // En cas d'erreur, créer des boutons texte simples
+    SDL_Color textColor = {255, 255, 255};
+    TTF_Font *tmpFont = TTF_OpenFont("img/arial.ttf", 24);
+    
+    if (!menu->button_diminuer) {
+        if (tmpFont) {
+            menu->button_diminuer = TTF_RenderText_Solid(tmpFont, "- Volume", textColor);
+            menu->button_diminuer_hovered = TTF_RenderText_Solid(tmpFont, "- VOLUME", textColor);
+        }
+    }
+    if (!menu->button_augmenter) {
+        if (tmpFont) {
+            menu->button_augmenter = TTF_RenderText_Solid(tmpFont, "+ Volume", textColor);
+            menu->button_augmenter_hovered = TTF_RenderText_Solid(tmpFont, "+ VOLUME", textColor);
+        }
+    }
+    if (!menu->button_plein_ecran) {
+        if (tmpFont) {
+            menu->button_plein_ecran = TTF_RenderText_Solid(tmpFont, "Plein Ecran", textColor);
+            menu->button_plein_ecran_hovered = TTF_RenderText_Solid(tmpFont, "PLEIN ECRAN", textColor);
+        }
+    }
+    if (!menu->button_normal) {
+        if (tmpFont) {
+            menu->button_normal = TTF_RenderText_Solid(tmpFont, "Mode Normal", textColor);
+            menu->button_normal_hovered = TTF_RenderText_Solid(tmpFont, "MODE NORMAL", textColor);
+        }
+    }
+    if (!menu->button_retour) {
+        if (tmpFont) {
+            menu->button_retour = TTF_RenderText_Solid(tmpFont, "Retour", textColor);
+            menu->button_retour_hovered = TTF_RenderText_Solid(tmpFont, "RETOUR", textColor);
+        }
+    }
+    
+    // Libérer la police temporaire si utilisée
+    if (tmpFont) {
+        TTF_CloseFont(tmpFont);
+    }
+
+    // Chargement du son de clic
+    menu->click_sound = Mix_LoadWAV("sound/click.wav");
+    if (!menu->click_sound) {
+        printf("Erreur de chargement du son: %s\n", Mix_GetError());
+    }
+
+    // Chargement de la police
+    menu->font = TTF_OpenFont("img/arial.ttf", 30);
+    if (!menu->font) {
+        printf("Erreur de chargement de la police: %s\n", TTF_GetError());
+    }
+
+    // Initialiser le volume sonore
+    Mix_Volume(-1, menu->volume);
+    Mix_VolumeMusic(menu->volume);
+}
+
+// Nettoyage des ressources du menu des paramètres
+void cleanupSettingsMenu(SettingsMenu *menu) {
+    if (menu->background) SDL_FreeSurface(menu->background);
+    if (menu->fullscreen_background) SDL_FreeSurface(menu->fullscreen_background);
+    if (menu->button_diminuer) SDL_FreeSurface(menu->button_diminuer);
+    if (menu->button_diminuer_hovered) SDL_FreeSurface(menu->button_diminuer_hovered);
+    if (menu->button_augmenter) SDL_FreeSurface(menu->button_augmenter);
+    if (menu->button_augmenter_hovered) SDL_FreeSurface(menu->button_augmenter_hovered);
+    if (menu->button_plein_ecran) SDL_FreeSurface(menu->button_plein_ecran);
+    if (menu->button_plein_ecran_hovered) SDL_FreeSurface(menu->button_plein_ecran_hovered);
+    if (menu->button_normal) SDL_FreeSurface(menu->button_normal);
+    if (menu->button_normal_hovered) SDL_FreeSurface(menu->button_normal_hovered);
+    if (menu->button_retour) SDL_FreeSurface(menu->button_retour);
+    if (menu->button_retour_hovered) SDL_FreeSurface(menu->button_retour_hovered);
+    if (menu->click_sound) Mix_FreeChunk(menu->click_sound);
+    if (menu->font) TTF_CloseFont(menu->font);
+}
+
+// Gestion des survols de boutons
+void handleMouseOverSettings(SDL_Rect button_rect, SDL_Surface *button_normal, SDL_Surface *button_hovered, SDL_Surface **current_button) {
+    int x, y;
+    SDL_GetMouseState(&x, &y);
+
+    if (x >= button_rect.x && x <= button_rect.x + button_rect.w &&
+        y >= button_rect.y && y <= button_rect.y + button_rect.h) {
+        *current_button = button_hovered;  // Image survolée
+    } else {
+        *current_button = button_normal;   // Image normale
+    }
+}
+
+// Augmentation du volume
+void increaseVolume(SettingsMenu *menu) {
+    menu->volume += 8;
+    if (menu->volume > 128) menu->volume = 128;  // Volume maximum pour SDL_mixer
+    Mix_Volume(-1, menu->volume);
+    Mix_VolumeMusic(menu->volume);
+}
+
+// Diminution du volume
+void decreaseVolume(SettingsMenu *menu) {
+    menu->volume -= 8;
+    if (menu->volume < 0) menu->volume = 0;  // Volume minimum pour SDL_mixer
+    Mix_Volume(-1, menu->volume);
+    Mix_VolumeMusic(menu->volume);
+}
+
+// Basculer en mode plein écran
+void toggleFullscreen(SDL_Surface **screen, SettingsMenu *menu) {
+    if (menu->is_fullscreen) {
+        *screen = SDL_SetVideoMode(1500, 800, 32, SDL_HWSURFACE | SDL_DOUBLEBUF);
+        menu->is_fullscreen = 0;
+    } else {
+        *screen = SDL_SetVideoMode(0, 0, 32, SDL_HWSURFACE | SDL_DOUBLEBUF | SDL_FULLSCREEN);
+        menu->is_fullscreen = 1;
+    }
+}
+
+// Fonction pour dessiner du texte
+SDL_Surface* drawSettingsText(const char *text, TTF_Font *font, SDL_Color textColor) {
+    return TTF_RenderText_Solid(font, text, textColor);
+}
+
+// Boucle principale du menu des paramètres
+void settingsMenuLoop(SDL_Surface **screen, SettingsMenu *menu) {
+    int running = 1;
+    SDL_Event event;
+
+    // Définition des positions des boutons
+    SDL_Rect volume_label_rect = { 200, 120, 0, 0 }; // Texte "Volume"
+    SDL_Rect button_diminuer_rect = { 200, 200, 100, 50 }; // Bouton diminuer
+    SDL_Rect button_augmenter_rect = { 500, 200, 100, 50 }; // Bouton augmenter
+    SDL_Rect display_label_rect = { 200, 270, 0, 0 }; // Texte "Mode d'affichage"
+    SDL_Rect button_plein_ecran_rect = { 200, 350, 100, 50 }; // Bouton plein écran
+    SDL_Rect button_normal_rect = { 500, 350, 100, 50 }; // Bouton mode normal
+    SDL_Rect button_retour_rect = { 680, 600, 150, 50 }; // Bouton retour
+    SDL_Rect volume_value_rect = { 350, 200, 100, 50 }; // Affichage valeur du volume
+
+    SDL_Surface *current_button_diminuer = menu->button_diminuer;
+    SDL_Surface *current_button_augmenter = menu->button_augmenter;
+    SDL_Surface *current_button_plein_ecran = menu->button_plein_ecran;
+    SDL_Surface *current_button_normal = menu->button_normal;
+    SDL_Surface *current_button_retour = menu->button_retour;
+
+    while (running) {
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
+                running = 0;
+            }
+
+            // Gestion des survols de boutons
+            handleMouseOverSettings(button_diminuer_rect, menu->button_diminuer, menu->button_diminuer_hovered, &current_button_diminuer);
+            handleMouseOverSettings(button_augmenter_rect, menu->button_augmenter, menu->button_augmenter_hovered, &current_button_augmenter);
+            handleMouseOverSettings(button_plein_ecran_rect, menu->button_plein_ecran, menu->button_plein_ecran_hovered, &current_button_plein_ecran);
+            handleMouseOverSettings(button_normal_rect, menu->button_normal, menu->button_normal_hovered, &current_button_normal);
+            handleMouseOverSettings(button_retour_rect, menu->button_retour, menu->button_retour_hovered, &current_button_retour);
+
+            // Gestion des clics sur les boutons
+            if (event.type == SDL_MOUSEBUTTONDOWN) {
+                if (event.button.button == SDL_BUTTON_LEFT) {
+                    // Bouton diminuer le volume
+                    if (event.button.x >= button_diminuer_rect.x && event.button.x <= button_diminuer_rect.x + button_diminuer_rect.w &&
+                        event.button.y >= button_diminuer_rect.y && event.button.y <= button_diminuer_rect.y + button_diminuer_rect.h) {
+                        decreaseVolume(menu);
+                        if (menu->click_sound) Mix_PlayChannel(-1, menu->click_sound, 0);
+                    }
+                    // Bouton augmenter le volume
+                    if (event.button.x >= button_augmenter_rect.x && event.button.x <= button_augmenter_rect.x + button_augmenter_rect.w &&
+                        event.button.y >= button_augmenter_rect.y && event.button.y <= button_augmenter_rect.y + button_augmenter_rect.h) {
+                        increaseVolume(menu);
+                        if (menu->click_sound) Mix_PlayChannel(-1, menu->click_sound, 0);
+                    }
+                    // Bouton plein écran
+                    if (event.button.x >= button_plein_ecran_rect.x && event.button.x <= button_plein_ecran_rect.x + button_plein_ecran_rect.w &&
+                        event.button.y >= button_plein_ecran_rect.y && event.button.y <= button_plein_ecran_rect.y + button_plein_ecran_rect.h) {
+                        if (!menu->is_fullscreen) {
+                            toggleFullscreen(screen, menu);
+                            if (menu->click_sound) Mix_PlayChannel(-1, menu->click_sound, 0);
+                        }
+                    }
+                    // Bouton mode normal
+                    if (event.button.x >= button_normal_rect.x && event.button.x <= button_normal_rect.x + button_normal_rect.w &&
+                        event.button.y >= button_normal_rect.y && event.button.y <= button_normal_rect.y + button_normal_rect.h) {
+                        if (menu->is_fullscreen) {
+                            toggleFullscreen(screen, menu);
+                            if (menu->click_sound) Mix_PlayChannel(-1, menu->click_sound, 0);
+                        }
+                    }
+                    // Bouton retour
+                    if (event.button.x >= button_retour_rect.x && event.button.x <= button_retour_rect.x + button_retour_rect.w &&
+                        event.button.y >= button_retour_rect.y && event.button.y <= button_retour_rect.y + button_retour_rect.h) {
+                        running = 0;
+                        if (menu->click_sound) Mix_PlayChannel(-1, menu->click_sound, 0);
+                    }
+                }
+            }
+
+            // Gestion des touches clavier
+            if (event.type == SDL_KEYDOWN) {
+                if (event.key.keysym.sym == SDLK_ESCAPE) {
+                    running = 0;
+                }
+                if (event.key.keysym.sym == SDLK_PLUS || event.key.keysym.sym == SDLK_KP_PLUS) {
+                    increaseVolume(menu);
+                    if (menu->click_sound) Mix_PlayChannel(-1, menu->click_sound, 0);
+                }
+                if (event.key.keysym.sym == SDLK_MINUS || event.key.keysym.sym == SDLK_KP_MINUS) {
+                    decreaseVolume(menu);
+                    if (menu->click_sound) Mix_PlayChannel(-1, menu->click_sound, 0);
+                }
+                if (event.key.keysym.sym == SDLK_F11) {
+                    toggleFullscreen(screen, menu);
+                    if (menu->click_sound) Mix_PlayChannel(-1, menu->click_sound, 0);
+                }
+            }
+        }
+
+        // Dessiner le fond d'écran
+        if (menu->is_fullscreen && menu->fullscreen_background) {
+            SDL_BlitSurface(menu->fullscreen_background, NULL, *screen, NULL);
+        } else if (menu->background) {
+            SDL_BlitSurface(menu->background, NULL, *screen, NULL);
+        }
+
+        // Dessiner les textes
+        SDL_Surface *volume_label = NULL;
+        SDL_Surface *display_label = NULL;
+        SDL_Surface *volume_value = NULL;
+        
+        if (menu->font) {
+            // Texte "Volume"
+            volume_label = drawSettingsText("Volume", menu->font, menu->textColor);
+            // Texte "Mode d'affichage"
+            display_label = drawSettingsText("Mode d'affichage", menu->font, menu->textColor);
+            
+            // Affichage de la valeur du volume (0-100%)
+            char volume_text[10];
+            int percentage = (menu->volume * 100) / 128;
+            sprintf(volume_text, "%d%%", percentage);
+            volume_value = drawSettingsText(volume_text, menu->font, menu->textColor);
+        }
+
+        // Position des textes
+        SDL_Rect volume_label_position = { 350, 120, 0, 0 };
+        SDL_Rect display_label_position = { 350, 300, 0, 0 };
+        SDL_Rect volume_value_position = { 350, 200, 0, 0 };
+
+        // Dessiner les textes
+        if (volume_label) SDL_BlitSurface(volume_label, NULL, *screen, &volume_label_position);
+        if (display_label) SDL_BlitSurface(display_label, NULL, *screen, &display_label_position);
+        if (volume_value) SDL_BlitSurface(volume_value, NULL, *screen, &volume_value_position);
+
+        // Dessiner les boutons
+        SDL_BlitSurface(current_button_diminuer, NULL, *screen, &button_diminuer_rect);
+        SDL_BlitSurface(current_button_augmenter, NULL, *screen, &button_augmenter_rect);
+        SDL_BlitSurface(current_button_plein_ecran, NULL, *screen, &button_plein_ecran_rect);
+        SDL_BlitSurface(current_button_normal, NULL, *screen, &button_normal_rect);
+        SDL_BlitSurface(current_button_retour, NULL, *screen, &button_retour_rect);
+
+        // Mise à jour de l'écran
+        SDL_Flip(*screen);
+
+        // Libérer les surfaces
+        if (volume_label) SDL_FreeSurface(volume_label);
+        if (display_label) SDL_FreeSurface(display_label);
+        if (volume_value) SDL_FreeSurface(volume_value);
+
+        // Limiter à ~60 FPS
+        SDL_Delay(16);
+    }
+}
+
+// Fonctions pour l'énigme
+void InitEnigme(enigmetf *e, char nomfichier[])
+{
+    FILE *f = NULL;
+
+    e->pos_selected = 0;
+    e->rc = 0;
+    e->background1 = IMG_Load("enigme/img/background.png");
+    e->background2 = IMG_Load("enigme/img/bg_animated.png");
+    e->currentbackg = 1;
+    e->button = IMG_Load("enigme/img/button.png");
+    e->button_s = IMG_Load("enigme/img/button_s.png");
+
+    SDL_Color couleur = {255, 255, 255};
+
+    e->police = TTF_OpenFont("arial.ttf", 17);
+    e->police1 = TTF_OpenFont("arial.ttf", 30);
+    
+    if (e->police == NULL || e->police1 == NULL) {
+        printf("Erreur lors du chargement de la police: %s\n", TTF_GetError());
+        if (e->police == NULL) e->police = TTF_OpenFont("img/arial.ttf", 17);
+        if (e->police1 == NULL) e->police1 = TTF_OpenFont("img/arial.ttf", 30);
+    }
+
+    srand(time(NULL));
+    e->num_question = rand() % 4;
+
+    while (e->num_question == 0)
+    {
+        srand(time(NULL));
+        e->num_question = rand() % 4;
+    }
+    printf("Question numéro: %d\n", e->num_question);
+
+    char rep1[50];
+    char rep2[50];
+    char rep3[50];
+    strcpy(rep1, "");
+    strcpy(rep2, "");
+    strcpy(rep3, "");
+    int rc = 0;
+
+    f = fopen(nomfichier, "r");
+    if (f != NULL)
+    {
+        fscanf(f, "%[^_]_%[^_]_%[^_]_%[^_]_%d", e->chquestion, rep1, rep2, rep3, &rc);
+        int test = 1;
+        while (test != e->num_question)
+        {
+            fscanf(f, "%[^_]_%[^_]_%[^_]_%[^_]_%d", e->chquestion, rep1, rep2, rep3, &rc);
+            test++;
+        }
+        fclose(f);
+    }
+    else {
+        printf("Impossible d'ouvrir le fichier de questions.\n");
+        strcpy(e->chquestion, "Quelle est la capitale de la France?");
+        strcpy(rep1, "Paris");
+        strcpy(rep2, "Londres");
+        strcpy(rep3, "Rome");
+        rc = 1;
+    }
+
+    e->rc = rc;
+    printf("Réponse correcte: %d\n", e->rc);
+
+    e->question = TTF_RenderText_Blended(e->police, e->chquestion, couleur);
+    e->reponses[0] = TTF_RenderText_Blended(e->police1, rep1, couleur);
+    e->reponses[1] = TTF_RenderText_Blended(e->police1, rep2, couleur);
+    e->reponses[2] = TTF_RenderText_Blended(e->police1, rep3, couleur);
+
+    // Positions des éléments de l'énigme
+    e->pos_question.x = 270;
+    e->pos_question.y = 270;
+
+    e->pos_reponse1.x = 380;
+    e->pos_reponse1.y = 500;
+
+    e->pos_reponse2.x = 380 - 240;
+    e->pos_reponse2.y = 500 + 180;
+
+    e->pos_reponse3.x = 380 + 240;
+    e->pos_reponse3.y = 500 + 180;
+
+    e->pos_reponse1txt.x = e->pos_reponse1.x + 50;
+    e->pos_reponse1txt.y = e->pos_reponse1.y + 30;
+
+    e->pos_reponse2txt.x = e->pos_reponse2.x + 50;
+    e->pos_reponse2txt.y = e->pos_reponse2.y + 30;
+
+    e->pos_reponse3txt.x = e->pos_reponse3.x + 50;
+    e->pos_reponse3txt.y = e->pos_reponse3.y + 30;
+
+    e->image_clock = IMG_Load("enigme/img/clock1.png");
+
+    e->pos_image_clock.x = 500;
+    e->pos_image_clock.y = 100;
+
+    e->single_Clock.w = 57;
+    e->single_Clock.h = 81;
+    e->single_Clock.x = 0;
+    e->single_Clock.y = 0;
+
+    e->clock_num = 0;
+}
+
+void afficherEnigme(enigmetf e, SDL_Surface *ecran)
+{
+    if (e.currentbackg == 1)
+    {
+        SDL_BlitSurface(e.background1, NULL, ecran, NULL);
+    }
+    else
+    {
+        SDL_BlitSurface(e.background2, NULL, ecran, NULL);
+    }
+    displayClock(e, ecran);
+    SDL_BlitSurface(e.question, NULL, ecran, &e.pos_question);
+
+    switch (e.pos_selected)
+    {
+    case 0:
+        SDL_BlitSurface(e.button, NULL, ecran, &e.pos_reponse1);
+        SDL_BlitSurface(e.button, NULL, ecran, &e.pos_reponse2);
+        SDL_BlitSurface(e.button, NULL, ecran, &e.pos_reponse3);
+        SDL_BlitSurface(e.reponses[0], NULL, ecran, &e.pos_reponse1txt);
+        SDL_BlitSurface(e.reponses[1], NULL, ecran, &e.pos_reponse2txt);
+        SDL_BlitSurface(e.reponses[2], NULL, ecran, &e.pos_reponse3txt);
+        break;
+
+    case 1:
+    {
+        SDL_BlitSurface(e.button_s, NULL, ecran, &e.pos_reponse1);
+        SDL_BlitSurface(e.button, NULL, ecran, &e.pos_reponse2);
+        SDL_BlitSurface(e.button, NULL, ecran, &e.pos_reponse3);
+        SDL_BlitSurface(e.reponses[0], NULL, ecran, &e.pos_reponse1txt);
+        SDL_BlitSurface(e.reponses[1], NULL, ecran, &e.pos_reponse2txt);
+        SDL_BlitSurface(e.reponses[2], NULL, ecran, &e.pos_reponse3txt);
+    }
+    break;
+    case 2:
+    {
+        SDL_BlitSurface(e.button, NULL, ecran, &e.pos_reponse1);
+        SDL_BlitSurface(e.button_s, NULL, ecran, &e.pos_reponse2);
+        SDL_BlitSurface(e.button, NULL, ecran, &e.pos_reponse3);
+        SDL_BlitSurface(e.reponses[0], NULL, ecran, &e.pos_reponse1txt);
+        SDL_BlitSurface(e.reponses[1], NULL, ecran, &e.pos_reponse2txt);
+        SDL_BlitSurface(e.reponses[2], NULL, ecran, &e.pos_reponse3txt);
+    }
+    break;
+    case 3:
+    {
+        SDL_BlitSurface(e.button, NULL, ecran, &e.pos_reponse1);
+        SDL_BlitSurface(e.button, NULL, ecran, &e.pos_reponse2);
+        SDL_BlitSurface(e.button_s, NULL, ecran, &e.pos_reponse3);
+        SDL_BlitSurface(e.reponses[0], NULL, ecran, &e.pos_reponse1txt);
+        SDL_BlitSurface(e.reponses[1], NULL, ecran, &e.pos_reponse2txt);
+        SDL_BlitSurface(e.reponses[2], NULL, ecran, &e.pos_reponse3txt);
+    }
+    break;
+    default:
+        break;
+    }
+}
+
+void displayClock(enigmetf e, SDL_Surface *ecran)
+{
+    SDL_BlitSurface(e.image_clock, &(e.single_Clock), ecran, &e.pos_image_clock);
+}
+
+void verify_enigme(enigmetf e, SDL_Surface *ecran)
+{
+    SDL_Rect pos = {160, 330};
+    printf("Choix sélectionné: %d\n", e.pos_selected);
+    printf("Réponse correcte: %d\n", e.rc);
+
+    if (e.pos_selected == e.rc)
+    {
+        printf("Vous avez gagné!\n");
+        SDL_Surface *win = IMG_Load("enigme/img/youwin.png");
+        if (win) {
+            SDL_BlitSurface(win, NULL, ecran, &pos);
+            SDL_Flip(ecran);
+            SDL_FreeSurface(win);
+            SDL_Delay(2000);
+        }
+    }
+    else
+    {
+        SDL_Surface *lost = IMG_Load("enigme/img/youlost.png");
+        if (lost) {
+            SDL_BlitSurface(lost, NULL, ecran, &pos);
+            SDL_Flip(ecran);
+            printf("Vous avez perdu!\n");
+            SDL_FreeSurface(lost);
+            SDL_Delay(2000);
+        }
+    }
+}
+
+void animer(enigmetf *e)
+{
+    if (e->clock_num >= 0 && e->clock_num < 8)
+    {
+        e->single_Clock.x = e->clock_num * e->single_Clock.w;
+        e->clock_num++;
+    }
+
+    if (e->clock_num == 8)
+    {
+        e->single_Clock.x = e->clock_num * e->single_Clock.w;
+        e->clock_num = 0;
+    }
+    SDL_Delay(50);
+}
+
+void animer_background(enigmetf *e)
+{
+    static int frame = 0;
+    frame++;
+    if (frame % 7 == 0)
+    {
+        e->currentbackg = (e->currentbackg == 1) ? 2 : 1;
+    }
+}
+
+void free_Surface_enigme(enigmetf *e)
+{
+    if (e->background1) SDL_FreeSurface(e->background1);
+    if (e->background2) SDL_FreeSurface(e->background2);
+    if (e->question) SDL_FreeSurface(e->question);
+    if (e->reponses[0]) SDL_FreeSurface(e->reponses[0]);
+    if (e->reponses[1]) SDL_FreeSurface(e->reponses[1]);
+    if (e->reponses[2]) SDL_FreeSurface(e->reponses[2]);
+    if (e->button) SDL_FreeSurface(e->button);
+    if (e->button_s) SDL_FreeSurface(e->button_s);
+    if (e->image_clock) SDL_FreeSurface(e->image_clock);
+    
+    if (e->police) TTF_CloseFont(e->police);
+    if (e->police1) TTF_CloseFont(e->police1);
+}
+
+// Fonction principale pour jouer à l'énigme
+int jouerEnigme(SDL_Surface *ecran)
+{
+    enigmetf e;
+    int quit = 0;
+    int timeOut = 0;
+    int result = 0; // 0 = perdu, 1 = gagné
+    Uint32 timerDebut;
+    Uint32 tempsRestant = 30000; // 30 secondes
+    SDL_Event event;
+    
+    // Initialiser TTF si ce n'est pas déjà fait
+    if (TTF_WasInit() == 0) {
+        if (TTF_Init() == -1) {
+            printf("Erreur d'initialisation de TTF: %s\n", TTF_GetError());
+            return 0;
+        }
+    }
+
+    // Initialiser l'énigme
+    InitEnigme(&e, "enigme/fichier.txt");
+    timerDebut = SDL_GetTicks();
+
+    // Boucle principale du jeu d'énigme
+    while (!quit && !timeOut)
+    {
+        // Gestion des événements
+        while (SDL_PollEvent(&event))
+        {
+            switch (event.type)
+            {
+            case SDL_QUIT:
+                quit = 1;
+                break;
+            case SDL_KEYDOWN:
+                switch (event.key.keysym.sym)
+                {
+                case SDLK_ESCAPE:
+                    quit = 1;
+                    break;
+                case SDLK_UP:
+                    e.pos_selected = 1;
+                    break;
+                case SDLK_DOWN:
+                    if (e.pos_selected == 1)
+                        e.pos_selected = 2;
+                    else
+                        e.pos_selected = 3;
+                    break;
+                case SDLK_RIGHT:
+                    e.pos_selected = 3;
+                    break;
+                case SDLK_LEFT:
+                    e.pos_selected = 2;
+                    break;
+                case SDLK_RETURN:
+                    verify_enigme(e, ecran);
+                    if (e.pos_selected == e.rc)
+                    {
+                        result = 1;
+                    }
+                    quit = 1;
+                    break;
+                }
+                break;
+            case SDL_MOUSEMOTION:
+                // Détecter sur quelle réponse la souris se trouve
+                if (e.button && event.motion.x >= e.pos_reponse1.x && event.motion.x <= e.pos_reponse1.x + e.button->w &&
+                    event.motion.y >= e.pos_reponse1.y && event.motion.y <= e.pos_reponse1.y + e.button->h)
+                {
+                    e.pos_selected = 1;
+                }
+                else if (e.button && event.motion.x >= e.pos_reponse2.x && event.motion.x <= e.pos_reponse2.x + e.button->w &&
+                         event.motion.y >= e.pos_reponse2.y && event.motion.y <= e.pos_reponse2.y + e.button->h)
+                {
+                    e.pos_selected = 2;
+                }
+                else if (e.button && event.motion.x >= e.pos_reponse3.x && event.motion.x <= e.pos_reponse3.x + e.button->w &&
+                         event.motion.y >= e.pos_reponse3.y && event.motion.y <= e.pos_reponse3.y + e.button->h)
+                {
+                    e.pos_selected = 3;
+                }
+                break;
+            case SDL_MOUSEBUTTONDOWN:
+                if (event.button.button == SDL_BUTTON_LEFT)
+                {
+                    // Vérifier sur quel bouton l'utilisateur a cliqué
+                    if (e.button && event.button.x >= e.pos_reponse1.x && event.button.x <= e.pos_reponse1.x + e.button->w &&
+                        event.button.y >= e.pos_reponse1.y && event.button.y <= e.pos_reponse1.y + e.button->h)
+                    {
+                        e.pos_selected = 1;
+                        verify_enigme(e, ecran);
+                        if (e.pos_selected == e.rc)
+                        {
+                            result = 1;
+                        }
+                        quit = 1;
+                    }
+                    else if (e.button && event.button.x >= e.pos_reponse2.x && event.button.x <= e.pos_reponse2.x + e.button->w &&
+                             event.button.y >= e.pos_reponse2.y && event.button.y <= e.pos_reponse2.y + e.button->h)
+                    {
+                        e.pos_selected = 2;
+                        verify_enigme(e, ecran);
+                        if (e.pos_selected == e.rc)
+                        {
+                            result = 1;
+                        }
+                        quit = 1;
+                    }
+                    else if (e.button && event.button.x >= e.pos_reponse3.x && event.button.x <= e.pos_reponse3.x + e.button->w &&
+                             event.button.y >= e.pos_reponse3.y && event.button.y <= e.pos_reponse3.y + e.button->h)
+                    {
+                        e.pos_selected = 3;
+                        verify_enigme(e, ecran);
+                        if (e.pos_selected == e.rc)
+                        {
+                            result = 1;
+                        }
+                        quit = 1;
+                    }
+                }
+                break;
+            }
+        }
+
+        // Vérifier le temps restant
+        Uint32 tempsEcoule = SDL_GetTicks() - timerDebut;
+        if (tempsEcoule > tempsRestant)
+        {
+            timeOut = 1;
+            SDL_Rect pos = {160, 330};
+            SDL_Surface *lost = IMG_Load("enigme/img/youlost.png");
+            if (lost) {
+                SDL_BlitSurface(lost, NULL, ecran, &pos);
+                SDL_Flip(ecran);
+                printf("Temps écoulé! Vous avez perdu!\n");
+                SDL_FreeSurface(lost);
+                SDL_Delay(2000);
+            }
+        }
+
+        // Animer l'horloge et le fond
+        animer(&e);
+        animer_background(&e);
+
+        // Afficher l'énigme
+        afficherEnigme(e, ecran);
+        SDL_Flip(ecran);
+    }
+
+    // Libérer les ressources
+    free_Surface_enigme(&e);
+    
+    // Un petit délai pour assurer que la mémoire est bien libérée
+    SDL_Delay(100);
+
+    // Retourner le résultat
+    return result;
 }

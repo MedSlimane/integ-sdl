@@ -13,6 +13,7 @@ void initMenu(Menu *menu) {
     menu->btn_solo = IMG_Load("img/menu/singleplayer.png");
     menu->btn_duo = IMG_Load("img/menu/multiplayer.png");
     menu->btn_quitter = IMG_Load("img/menu/back.png");
+    menu->btn_settings = IMG_Load("img/menu/settings.png");
     
     // Chargement des images pour le menu des options
     menu->btn_zqsd = IMG_Load("img/menu/zqsd.png");
@@ -24,9 +25,27 @@ void initMenu(Menu *menu) {
     // Vérification du chargement des images
     if (!menu->background || !menu->logo || !menu->btn_solo || !menu->btn_duo || 
         !menu->btn_quitter || !menu->btn_zqsd || !menu->btn_arrows || 
-        !menu->btn_avatar1 || !menu->btn_avatar2 || !menu->btn_back) {
+        !menu->btn_avatar1 || !menu->btn_avatar2 || !menu->btn_back || !menu->btn_settings) {
         printf("Erreur de chargement des images du menu: %s\n", SDL_GetError());
-        exit(EXIT_FAILURE);
+        
+        // Si l'image settings n'est pas trouvée, créer une image simple
+        if (!menu->btn_settings) {
+            printf("Création d'un bouton de remplacement pour les paramètres\n");
+            TTF_Font *font = TTF_OpenFont("img/arial.ttf", 24);
+            if (font) {
+                SDL_Color textColor = {255, 255, 255};
+                menu->btn_settings = TTF_RenderText_Solid(font, "Paramètres", textColor);
+                TTF_CloseFont(font);
+            } else {
+                menu->btn_settings = SDL_CreateRGBSurface(SDL_SWSURFACE, 200, 50, 32, 0, 0, 0, 0);
+                SDL_FillRect(menu->btn_settings, NULL, SDL_MapRGB(menu->btn_settings->format, 100, 100, 200));
+            }
+        }
+        
+        if (!menu->background || !menu->logo || !menu->btn_solo || !menu->btn_duo || 
+            !menu->btn_quitter || !menu->btn_settings) {
+            exit(EXIT_FAILURE);
+        }
     }
     
     // Initialisation de SDL_mixer si ce n'est pas déjà fait
@@ -55,6 +74,7 @@ void libererMenu(Menu *menu) {
     SDL_FreeSurface(menu->btn_solo);
     SDL_FreeSurface(menu->btn_duo);
     SDL_FreeSurface(menu->btn_quitter);
+    SDL_FreeSurface(menu->btn_settings);
     SDL_FreeSurface(menu->btn_zqsd);
     SDL_FreeSurface(menu->btn_arrows);
     SDL_FreeSurface(menu->btn_avatar1);
@@ -149,7 +169,8 @@ int afficherMenu(SDL_Surface *screen, Menu *menu) {
     SDL_Rect pos_logo = {(SCREEN_WIDTH - menu->logo->w) / 2, 50, 0, 0};
     SDL_Rect pos_solo = {(SCREEN_WIDTH - menu->btn_solo->w) / 2, 300, 0, 0};
     SDL_Rect pos_duo = {(SCREEN_WIDTH - menu->btn_duo->w) / 2, 450, 0, 0};
-    SDL_Rect pos_quitter = {(SCREEN_WIDTH - menu->btn_quitter->w) / 2, 600, 0, 0};
+    SDL_Rect pos_settings = {(SCREEN_WIDTH - menu->btn_settings->w) / 2, 550, 0, 0};
+    SDL_Rect pos_quitter = {(SCREEN_WIDTH - menu->btn_quitter->w) / 2, 650, 0, 0};
     
     int running = 1;
     SDL_Event event;
@@ -161,6 +182,7 @@ int afficherMenu(SDL_Surface *screen, Menu *menu) {
         SDL_BlitSurface(menu->logo, NULL, screen, &pos_logo);
         SDL_BlitSurface(menu->btn_solo, NULL, screen, &pos_solo);
         SDL_BlitSurface(menu->btn_duo, NULL, screen, &pos_duo);
+        SDL_BlitSurface(menu->btn_settings, NULL, screen, &pos_settings);
         SDL_BlitSurface(menu->btn_quitter, NULL, screen, &pos_quitter);
         SDL_Flip(screen);
         
@@ -192,6 +214,14 @@ int afficherMenu(SDL_Surface *screen, Menu *menu) {
                             return MODE_DUO;
                         }
                         
+                        // Clic sur le bouton Paramètres
+                        if (x >= pos_settings.x && x <= pos_settings.x + menu->btn_settings->w &&
+                            y >= pos_settings.y && y <= pos_settings.y + menu->btn_settings->h) {
+                            Mix_PlayChannel(-1, menu->son_clic, 0);
+                            SDL_Delay(200);
+                            return MODE_SETTINGS;
+                        }
+                        
                         // Clic sur le bouton quitter
                         if (x >= pos_quitter.x && x <= pos_quitter.x + menu->btn_quitter->w &&
                             y >= pos_quitter.y && y <= pos_quitter.y + menu->btn_quitter->h) {
@@ -206,4 +236,21 @@ int afficherMenu(SDL_Surface *screen, Menu *menu) {
     }
     
     return MODE_QUITTER;
+}
+
+// Affichage du menu des paramètres
+void afficherMenuSettings(SDL_Surface **screen, Menu *menu, SettingsMenu *settingsMenu) {
+    // Initialiser le menu des paramètres
+    initSettingsMenu(settingsMenu);
+    
+    // Passer en mode plein écran si nécessaire
+    if (settingsMenu->is_fullscreen) {
+        *screen = SDL_SetVideoMode(0, 0, 32, SDL_HWSURFACE | SDL_DOUBLEBUF | SDL_FULLSCREEN);
+    }
+    
+    // Exécuter la boucle du menu des paramètres
+    settingsMenuLoop(screen, settingsMenu);
+    
+    // Libérer les ressources du menu des paramètres
+    cleanupSettingsMenu(settingsMenu);
 }

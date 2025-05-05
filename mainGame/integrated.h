@@ -4,6 +4,7 @@
 #include <SDL/SDL.h>
 #include <SDL/SDL_image.h>
 #include <SDL/SDL_ttf.h>
+#include <SDL/SDL_mixer.h>
 #include <math.h>
 
 // Structure pour le texte
@@ -13,6 +14,41 @@ typedef struct {
     SDL_Surface* text;
     SDL_Rect postext;
 } Text;
+
+// Structure pour l'énigme
+typedef struct { 
+    SDL_Surface *background, *background1, *background2;  
+    SDL_Surface *question;    
+    SDL_Surface *reponses[4]; 
+    SDL_Surface *button, *button_s;
+    char chquestion[50];
+    char chrep[2][50];
+    int rc, pos_selected;     
+    SDL_Rect pos_question, pos_reponse1, pos_reponse2, pos_reponse3; 
+    int num_question;
+    SDL_Rect pos_reponse1txt, pos_reponse2txt, pos_reponse3txt;        
+    TTF_Font *police, *police1;
+    SDL_Surface *image_clock;
+    SDL_Rect pos_image_clock;
+    SDL_Rect single_Clock;
+    int clock_num, currentbackg;
+} enigmetf;
+
+// Structure pour le menu des paramètres
+typedef struct {
+    SDL_Surface *background;
+    SDL_Surface *fullscreen_background;
+    SDL_Surface *button_diminuer, *button_diminuer_hovered;
+    SDL_Surface *button_augmenter, *button_augmenter_hovered;
+    SDL_Surface *button_plein_ecran, *button_plein_ecran_hovered;
+    SDL_Surface *button_normal, *button_normal_hovered;
+    SDL_Surface *button_retour, *button_retour_hovered;
+    Mix_Chunk *click_sound;
+    TTF_Font *font;
+    SDL_Color textColor;
+    int volume;
+    int is_fullscreen;
+} SettingsMenu;
 
 // Structure pour le personnage
 typedef struct {
@@ -128,5 +164,25 @@ void handleEventsDuo(SDL_Event event, Personne *perso1, Personne *perso2, int *r
 // Fonctions pour le mode duo (écran partagé)
 void jouerModeSolo(SDL_Surface *screen);
 void jouerModeDuo(SDL_Surface *screen);
+
+// Fonctions pour le menu des paramètres
+void initSettingsMenu(SettingsMenu *menu);
+void cleanupSettingsMenu(SettingsMenu *menu);
+void handleMouseOverSettings(SDL_Rect button_rect, SDL_Surface *button_normal, SDL_Surface *button_hovered, SDL_Surface **current_button);
+void increaseVolume(SettingsMenu *menu);
+void decreaseVolume(SettingsMenu *menu);
+void toggleFullscreen(SDL_Surface **screen, SettingsMenu *menu);
+void settingsMenuLoop(SDL_Surface **screen, SettingsMenu *menu);
+SDL_Surface* drawSettingsText(const char *text, TTF_Font *font, SDL_Color textColor);
+
+// Fonctions pour l'énigme
+void InitEnigme(enigmetf *e, char nomfichier[]);
+void afficherEnigme(enigmetf e, SDL_Surface *ecran);
+void displayClock(enigmetf e, SDL_Surface *ecran);
+void verify_enigme(enigmetf e, SDL_Surface *ecran);
+void animer(enigmetf *e);
+void free_Surface_enigme(enigmetf *e);
+void animer_background(enigmetf *e);
+int jouerEnigme(SDL_Surface *ecran); // Fonction principale qui retourne 1 si gagné, 0 si perdu
 
 #endif

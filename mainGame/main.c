@@ -7,8 +7,8 @@
 #include "integrated.h"
 #include "menu.h"
 
-#define SCREEN_WIDTH 1920
-#define SCREEN_HEIGHT 1080
+#define SCREEN_WIDTH 1500
+#define SCREEN_HEIGHT 800
 
 int main(int argc, char *argv[]) {
     // Initialisation de SDL, TTF, SDL_image et SDL_mixer
@@ -42,21 +42,36 @@ int main(int argc, char *argv[]) {
     Menu menu;
     initMenu(&menu);
     
-    // Affichage du menu et récupération du mode choisi
-    int mode = afficherMenu(screen, &menu);
+    int running = 1;
+    int mode = 0;
     
-    // Lancement du jeu selon le mode choisi
-    switch (mode) {
-        case MODE_SOLO:
-            jouerModeSolo(screen);
-            break;
-        case MODE_DUO:
-            jouerModeDuo(screen);
-            break;
-        case MODE_QUITTER:
-        default:
-            // Sortir du jeu
-            break;
+    // Structure pour le menu des paramètres
+    SettingsMenu settingsMenu;
+    
+    while (running) {
+        // Affichage du menu et récupération du mode choisi
+        mode = afficherMenu(screen, &menu);
+        
+        // Lancement du jeu selon le mode choisi
+        switch (mode) {
+            case MODE_SOLO:
+                jouerModeSolo(screen);
+                break;
+            case MODE_DUO:
+                jouerModeDuo(screen);
+                break;
+            case MODE_SETTINGS:
+                // Affichage du menu des paramètres
+                afficherMenuSettings(&screen, &menu, &settingsMenu);
+                // Revenir au menu principal
+                break;
+            case MODE_QUITTER:
+                running = 0;
+                break;
+            default:
+                running = 0;
+                break;
+        }
     }
     
     // Libération des ressources du menu
