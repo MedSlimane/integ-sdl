@@ -40,6 +40,24 @@ typedef struct {
     int clock_num, currentbackg;
 } enigmetf;
 
+// Structure pour l'énigme puzzle
+typedef struct {
+    SDL_Surface *puzzle_image;       // L'image du puzzle principale
+    SDL_Surface *piece_options[3];   // Les 3 options de pièces
+    SDL_Surface *background;         // Surface d'arrière-plan
+    SDL_Rect puzzle_pos;             // Position du puzzle
+    SDL_Rect options_pos[3];         // Positions des 3 options
+    SDL_Rect correct_position;       // Où doit aller la pièce correcte
+    int correct_option;              // Index de l'option correcte (0, 1 ou 2)
+    int selected_piece;              // Pièce actuellement sélectionnée (-1 si aucune)
+    int is_solved;                   // Indicateur si le puzzle est résolu
+    Uint32 start_time;               // Quand le puzzle a commencé
+    Uint32 elapsed_time;             // Temps mis pour résoudre
+    float time_limit;                // Limite de temps pour résoudre le puzzle
+    SDL_Surface *time_bar;           // Indicateur visuel du temps
+    SDL_Rect time_bar_pos;           // Position de l'indicateur de temps
+} Enigme;
+
 // Structure pour le menu des paramètres
 typedef struct {
     SDL_Surface *background;
@@ -231,6 +249,16 @@ void animer(enigmetf *e);
 void free_Surface_enigme(enigmetf *e);
 void animer_background(enigmetf *e);
 int jouerEnigme(SDL_Surface *ecran); // Fonction principale qui retourne 1 si gagné, 0 si perdu
+
+// Fonctions pour l'énigme puzzle
+void init_enigme_puzzle(Enigme *e);
+void load_puzzle_images(Enigme *e);
+void display_enigme_puzzle(Enigme *e, SDL_Surface *screen);
+void handle_enigme_puzzle_events(Enigme *e, SDL_Event event, SDL_Surface *screen);
+void update_time_bar_puzzle(Enigme *e);
+int is_enigme_puzzle_solved(Enigme *e);
+void free_enigme_puzzle(Enigme *e);
+int jouerEnigmePuzzle(SDL_Surface *ecran); // Fonction principale qui retourne 1 si gagné, 0 si perdu
 
 // Fonctions pour la minicarte
 void initMinimap(Minimap *minimap, int screenWidth, int screenHeight);

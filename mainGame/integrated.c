@@ -494,6 +494,36 @@ void handleEvents(SDL_Event event, Personne *perso, int *running, int *bgX, int 
                 // Lancer le menu des scores au lieu de quitter directement
                 scoreMenuLoop(SDL_GetVideoSurface(), perso->Vscore);
                 break;
+            case SDLK_u:
+                // Sauvegarder la position et l'état du joueur avant l'énigme de puzzle
+                int savedPosX = perso->position.x;
+                int savedPosY = perso->position.y;
+                int savedPosX_abs = perso->posX_absolue;
+                int savedPosY_abs = perso->posY_absolue;
+                int savedDirection = perso->direction;
+                int savedUp = perso->up;
+                
+                // Temporairement désactiver les mouvements pendant l'énigme
+                perso->direction = 0;
+                perso->up = 0;
+                
+                // Lancer l'énigme du puzzle
+                int puzzleResult = jouerPuzzleEnigme(SDL_GetVideoSurface());
+                
+                // Restaurer la position et l'état du joueur après l'énigme
+                perso->position.x = savedPosX;
+                perso->position.y = savedPosY;
+                perso->posX_absolue = savedPosX_abs;
+                perso->posY_absolue = savedPosY_abs;
+                perso->direction = savedDirection;
+                perso->up = savedUp;
+                
+                // Récompenser le joueur s'il réussit l'énigme
+                if (puzzleResult) {
+                    perso->Vscore += 50; // Bonus de score pour avoir résolu le puzzle
+                    // Vous pourriez ajouter d'autres récompenses ici
+                }
+                break;
             default:
                 break;
         }
@@ -2059,6 +2089,57 @@ int jouerEnigme(SDL_Surface *ecran)
     return result;
 }
 
+// Fonction pour jouer à l'énigme du puzzle
+int jouerPuzzleEnigme(SDL_Surface *ecran) {
+    Enigme e;
+    int quit = 0;
+    int result = 0; // 0 = non résolu, 1 = résolu, -1 = échoué
+    SDL_Event event;
+
+    // Initialiser l'énigme du puzzle
+    init_enigme_puzzle(&e);
+    
+    // Boucle principale de l'énigme
+    while (!quit) {
+        // Vérifier si l'énigme est résolue ou échouée
+        result = is_enigme_puzzle_solved(&e);
+        if (result != 0) {
+            // Attendre un peu pour laisser le joueur voir le résultat
+            SDL_Delay(1000);
+            quit = 1;
+            continue;
+        }
+        
+        // Afficher l'énigme
+        display_enigme_puzzle(&e, ecran);
+        
+        // Traiter les événements
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
+                quit = 1;
+                result = -1;
+            }
+            else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
+                quit = 1;
+                result = -1;
+            }
+            else {
+                // Passer les événements à l'énigme
+                handle_enigme_puzzle_events(&e, event, ecran);
+            }
+        }
+        
+        // Limiter le framerate
+        SDL_Delay(16);
+    }
+    
+    // Libérer les ressources
+    free_enigme_puzzle(&e);
+    
+    // Retourner le résultat (1 = réussi, -1 = échoué)
+    return (result == 1) ? 1 : 0;
+}
+
 // Initialisation de la minicarte
 void initMinimap(Minimap *minimap, int screenWidth, int screenHeight) {
     // Créer la surface pour la minicarte
@@ -2227,4 +2308,337 @@ void freeMinimap(Minimap *minimap) {
     if (minimap->player_icon) {
         SDL_FreeSurface(minimap->player_icon);
     }
+}
+
+// Fonctions pour l'énigme puzzle
+void init_enigme_puzzle(Enigme *e) {
+    // Initialiser la graine aléatoire
+    srand(time(NULL));
+    
+    // Charger les images
+    load_puzzle_images(e);
+    
+    // Configurer les positions
+    e->puzzle_pos.x = 100;
+    e->puzzle_pos.y = 50;
+    
+    // Configurer les positions des options
+    e->options_pos[0].x = 100;
+    e->options_pos[0].y = 300;
+    e->options_pos[1].x = 300;
+    e->options_pos[1].y = 300;
+    e->options_pos[2].x = 500;
+    e->options_pos[2].y = 300;
+    
+    // Position de la barre de temps
+    e->time_bar_pos.x = 100;
+    e->time_bar_pos.y = 25;
+    e->time_bar_pos.w = 600;
+    e->time_bar_pos.h = 15;
+    
+    // Surface de la barre de temps
+    e->time_bar = SDL_CreateRGBSurface(SDL_SWSURFACE, 600, 15, 32, 0, 0, 0, 0);
+    SDL_FillRect(e->time_bar, NULL, SDL_MapRGB(e->time_bar->format, 0, 255, 0));
+    
+    // Initialiser les variables d'état
+    e->selected_piece = -1;
+    e->is_solved = 0;
+    e->time_limit = 30.0f; // Limite de temps de 30 secondes
+    e->start_time = SDL_GetTicks();
+    e->elapsed_time = 0;
+}
+
+void load_puzzle_images(Enigme *e) {
+    // Sélectionner aléatoirement quel puzzle utiliser (1, 2, ou 3)
+    int puzzle_num = rand() % 3 + 1;
+    
+    // Créer les chemins pour le puzzle sélectionné
+    char puzzle_path[256];
+    char piece1_path[256];
+    char piece2_path[256];
+    char piece3_path[256];
+    
+    sprintf(puzzle_path, "enigme/puzzle%d.png", puzzle_num);
+    sprintf(piece1_path, "enigme/piece%d_1.png", puzzle_num);
+    sprintf(piece2_path, "enigme/piece%d_2.png", puzzle_num);
+    sprintf(piece3_path, "enigme/piece%d_3.png", puzzle_num);
+    
+    // Charger l'image principale du puzzle avec une pièce manquante
+    e->puzzle_image = IMG_Load(puzzle_path);
+    if(!e->puzzle_image) {
+        printf("Impossible de charger l'image du puzzle: %s\n", IMG_GetError());
+        exit(1);
+    }
+    
+    // Charger les options de pièces
+    SDL_Surface *tempPieces[3];
+    tempPieces[0] = IMG_Load(piece1_path);
+    if(!tempPieces[0]) {
+        printf("Impossible de charger l'image de l'option 1: %s\n", IMG_GetError());
+        exit(1);
+    }
+    
+    tempPieces[1] = IMG_Load(piece2_path);
+    if(!tempPieces[1]) {
+        printf("Impossible de charger l'image de l'option 2: %s\n", IMG_GetError());
+        exit(1);
+    }
+    
+    tempPieces[2] = IMG_Load(piece3_path);
+    if(!tempPieces[2]) {
+        printf("Impossible de charger l'image de l'option 3: %s\n", IMG_GetError());
+        exit(1);
+    }
+    
+    // Attribuer aléatoirement les pièces aux options (les mélanger)
+    int indices[3] = {0, 1, 2};
+    
+    // Algorithme de mélange simple
+    for(int i = 0; i < 3; i++) {
+        int j = rand() % 3;
+        int temp = indices[i];
+        indices[i] = indices[j];
+        indices[j] = temp;
+    }
+    
+    // Attribuer des pièces aux options en fonction des indices mélangés
+    for(int i = 0; i < 3; i++) {
+        e->piece_options[i] = tempPieces[indices[i]];
+        // Se souvenir de quelle option est la bonne (piece1 est toujours la bonne)
+        if(indices[i] == 0) {
+            e->correct_option = i;
+        }
+    }
+    
+    // Créer un fond
+    e->background = SDL_CreateRGBSurface(SDL_SWSURFACE, 800, 600, 32, 0, 0, 0, 0);
+    SDL_FillRect(e->background, NULL, SDL_MapRGB(e->background->format, 200, 230, 255));
+    
+    // Définir la position correcte selon le puzzle
+    switch (puzzle_num)
+    {
+    case 1:
+        e->correct_position.x = 180;
+        e->correct_position.y = 180;
+        e->correct_position.w = e->piece_options[0]->w;
+        e->correct_position.h = e->piece_options[0]->h;
+        break;
+    case 2:
+        e->correct_position.x = 180;
+        e->correct_position.y = 180;
+        e->correct_position.w = e->piece_options[0]->w;
+        e->correct_position.h = e->piece_options[0]->h;
+        break;
+    case 3:
+        e->correct_position.x = 180;
+        e->correct_position.y = 180;
+        e->correct_position.w = e->piece_options[0]->w;
+        e->correct_position.h = e->piece_options[0]->h;
+        break;
+    default:
+        break;
+    }
+}
+
+void display_enigme_puzzle(Enigme *e, SDL_Surface *screen) {
+    // Afficher l'arrière-plan
+    SDL_BlitSurface(e->background, NULL, screen, NULL);
+    
+    // Afficher le puzzle
+    SDL_BlitSurface(e->puzzle_image, NULL, screen, &e->puzzle_pos);
+    
+    // Afficher la barre de temps
+    update_time_bar_puzzle(e);
+    SDL_BlitSurface(e->time_bar, NULL, screen, &e->time_bar_pos);
+    
+    // Afficher les options
+    for(int i = 0; i < 3; i++) {
+        // Sauter la pièce sélectionnée (elle est en train d'être déplacée)
+        if(i == e->selected_piece)
+            continue;
+            
+        SDL_BlitSurface(e->piece_options[i], NULL, screen, &e->options_pos[i]);
+    }
+    
+    // Si une pièce est sélectionnée, la dessiner à la position de la souris
+    if(e->selected_piece != -1) {
+        int mouse_x, mouse_y;
+        SDL_GetMouseState(&mouse_x, &mouse_y);
+        
+        SDL_Rect mouse_pos;
+        mouse_pos.x = mouse_x - e->piece_options[e->selected_piece]->w / 2;
+        mouse_pos.y = mouse_y - e->piece_options[e->selected_piece]->h / 2;
+        
+        SDL_BlitSurface(e->piece_options[e->selected_piece], NULL, screen, &mouse_pos);
+    }
+    
+    // Mettre à jour l'écran
+    SDL_Flip(screen);
+}
+
+void handle_enigme_puzzle_events(Enigme *e, SDL_Event event, SDL_Surface *screen) {
+    int mouse_x, mouse_y;
+    
+    // Gérer les événements de la souris
+    if(event.type == SDL_MOUSEBUTTONDOWN) {
+        SDL_GetMouseState(&mouse_x, &mouse_y);
+        
+        // Vérifier si l'utilisateur a cliqué sur une option
+        int found = 0;
+        for(int i = 0; i < 3; i++) {
+            if(mouse_x >= e->options_pos[i].x && 
+               mouse_x <= e->options_pos[i].x + e->piece_options[i]->w &&
+               mouse_y >= e->options_pos[i].y && 
+               mouse_y <= e->options_pos[i].y + e->piece_options[i]->h) {
+                e->selected_piece = i;
+                found = 1;
+                break;
+            }
+        }
+    }
+    else if(event.type == SDL_MOUSEBUTTONUP && e->selected_piece != -1) {
+        SDL_GetMouseState(&mouse_x, &mouse_y);
+        
+        // Vérifier si la pièce est placée près de la position correcte
+        if(e->selected_piece == e->correct_option &&
+           abs(mouse_x - (e->correct_position.x + e->piece_options[e->selected_piece]->w/2)) < 30 &&
+           abs(mouse_y - (e->correct_position.y + e->piece_options[e->selected_piece]->h/2)) < 30) {
+            // La pièce est correctement placée
+            e->is_solved = 1;
+            e->elapsed_time = SDL_GetTicks() - e->start_time;
+        }
+        
+        // Réinitialiser la pièce sélectionnée
+        e->selected_piece = -1;
+    }
+}
+
+void update_time_bar_puzzle(Enigme *e) {
+    // Calculer le temps restant
+    Uint32 current_time = SDL_GetTicks();
+    float elapsed_seconds = (current_time - e->start_time) / 1000.0f;
+    float time_ratio = 1.0f - (elapsed_seconds / e->time_limit);
+    
+    if(time_ratio < 0) time_ratio = 0;
+    if(time_ratio > 1) time_ratio = 1;
+    
+    // Mettre à jour la largeur de la barre de temps
+    int time_width = (int)(e->time_bar_pos.w * time_ratio);
+    
+    // Effacer la barre de temps
+    SDL_FillRect(e->time_bar, NULL, SDL_MapRGB(e->time_bar->format, 0, 0, 0));
+    
+    // Dessiner le temps restant
+    SDL_Rect remaining_time;
+    remaining_time.x = 0;
+    remaining_time.y = 0;
+    remaining_time.w = time_width;
+    remaining_time.h = e->time_bar_pos.h;
+    
+    // La couleur change en fonction du temps restant (vert->jaune->rouge)
+    Uint32 bar_color;
+    if(time_ratio > 0.6)
+        bar_color = SDL_MapRGB(e->time_bar->format, 0, 255, 0); // Vert
+    else if(time_ratio > 0.3)
+        bar_color = SDL_MapRGB(e->time_bar->format, 255, 255, 0); // Jaune
+    else
+        bar_color = SDL_MapRGB(e->time_bar->format, 255, 0, 0); // Rouge
+        
+    SDL_FillRect(e->time_bar, &remaining_time, bar_color);
+    
+    // Si le temps est écoulé, le puzzle échoue
+    if(time_ratio <= 0 && !e->is_solved) {
+        // Temps écoulé, puzzle échoué
+        e->is_solved = -1; // -1 signifie échoué
+    }
+}
+
+int is_enigme_puzzle_solved(Enigme *e) {
+    return e->is_solved;
+}
+
+void free_enigme_puzzle(Enigme *e) {
+    SDL_FreeSurface(e->puzzle_image);
+    for(int i = 0; i < 3; i++) {
+        SDL_FreeSurface(e->piece_options[i]);
+    }
+    SDL_FreeSurface(e->background);
+    SDL_FreeSurface(e->time_bar);
+}
+
+// Fonction principale pour jouer à l'énigme puzzle
+int jouerEnigmePuzzle(SDL_Surface *ecran) {
+    Enigme e;
+    int quit = 0;
+    int result = 0;
+    SDL_Event event;
+    
+    // Initialiser l'énigme puzzle
+    init_enigme_puzzle(&e);
+    
+    // Boucle principale
+    while (!quit) {
+        // Afficher l'énigme puzzle
+        display_enigme_puzzle(&e, ecran);
+        
+        // Traiter les événements
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
+                quit = 1;
+                result = 0;
+            }
+            else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
+                quit = 1;
+                result = 0;
+            }
+            else {
+                // Passer les événements à l'énigme puzzle
+                handle_enigme_puzzle_events(&e, event, ecran);
+            }
+        }
+        
+        // Vérifier si l'énigme est résolue
+        int enigme_status = is_enigme_puzzle_solved(&e);
+        if (enigme_status == 1) {
+            // Énigme résolue avec succès
+            result = 1;
+            quit = 1;
+        }
+        else if (enigme_status == -1) {
+            // Temps écoulé, énigme échouée
+            result = 0;
+            quit = 1;
+        }
+        
+        // Limiter le FPS
+        SDL_Delay(16);
+    }
+    
+    // Afficher le résultat pendant quelques secondes
+    SDL_Rect message_pos;
+    message_pos.x = 300;
+    message_pos.y = 200;
+    
+    TTF_Font *font = TTF_OpenFont("arial.ttf", 36);
+    SDL_Color color = {255, 255, 255};
+    SDL_Surface *message;
+    
+    if (result) {
+        message = TTF_RenderText_Blended(font, "Puzzle Résolu!", color);
+    } else {
+        message = TTF_RenderText_Blended(font, "Échec!", color);
+    }
+    
+    SDL_BlitSurface(message, NULL, ecran, &message_pos);
+    SDL_Flip(ecran);
+    SDL_Delay(2000); // Afficher le résultat pendant 2 secondes
+    
+    SDL_FreeSurface(message);
+    TTF_CloseFont(font);
+    
+    // Libérer les ressources
+    free_enigme_puzzle(&e);
+    
+    // Retourner le résultat (1 = réussi, 0 = échoué)
+    return result;
 }
