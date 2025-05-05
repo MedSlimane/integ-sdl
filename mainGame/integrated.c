@@ -710,8 +710,28 @@ void jouerModeSolo(SDL_Surface *screen) {
                                 TTF_CloseFont(messageFont);
                             }
                             
+                            // Sauvegarder la position et l'état du joueur avant l'énigme
+                            int savedPosX = perso.position.x;
+                            int savedPosY = perso.position.y;
+                            int savedPosX_abs = perso.posX_absolue;
+                            int savedPosY_abs = perso.posY_absolue;
+                            int savedDirection = perso.direction;
+                            int savedUp = perso.up;
+                            
+                            // Temporairement désactiver les mouvements pendant l'énigme
+                            perso.direction = 0;
+                            perso.up = 0;
+                            
                             // Lancer l'énigme
                             int enigmeResult = jouerEnigme(screen);
+                            
+                            // Restaurer la position et l'état du joueur après l'énigme
+                            perso.position.x = savedPosX;
+                            perso.position.y = savedPosY;
+                            perso.posX_absolue = savedPosX_abs;
+                            perso.posY_absolue = savedPosY_abs;
+                            perso.direction = savedDirection;
+                            perso.up = savedUp;
                             
                             if (enigmeResult) {
                                 // Si l'énigme est réussie, restaurer les vies du joueur et désactiver l'ennemi
@@ -750,6 +770,7 @@ void jouerModeSolo(SDL_Surface *screen) {
                                     
                                     // Libérer les ressources
                                     SDL_FreeSurface(messageText);
+                                    TTF_CloseFont(messageFont);
                                 }
                                 
                                 running = 0; // Fin du jeu
@@ -1895,6 +1916,16 @@ int jouerEnigme(SDL_Surface *ecran)
                 quit = 1;
                 break;
             case SDL_KEYDOWN:
+                // Liste des touches à ignorer pour bloquer les mouvements du joueur pendant l'énigme
+                if (event.key.keysym.sym == SDLK_SPACE || 
+                    event.key.keysym.sym == SDLK_d ||
+                    event.key.keysym.sym == SDLK_q ||
+                    event.key.keysym.sym == SDLK_z) {
+                    // Ne rien faire pour ces touches (bloquer les mouvements)
+                    break;
+                }
+                
+                // Gestion des autres touches pour l'énigme
                 switch (event.key.keysym.sym)
                 {
                 case SDLK_ESCAPE:
@@ -1922,6 +1953,8 @@ int jouerEnigme(SDL_Surface *ecran)
                         result = 1;
                     }
                     quit = 1;
+                    break;
+                default:
                     break;
                 }
                 break;
