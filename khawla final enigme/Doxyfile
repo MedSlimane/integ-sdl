@@ -1,0 +1,41 @@
+# Doxyfile 1.9.1
+
+# Nom du projet
+PROJECT_NAME           = "Enigme SDL"
+
+# Version du projet
+PROJECT_NUMBER         = "1.0"
+
+# Description du projet (facultatif, à inclure dans les balises de fichiers)
+PROJECT_BRIEF          = "Mini jeu SDL d'énigme avec animation et interaction."
+
+# Répertoire de sortie
+OUTPUT_DIRECTORY       = doc
+
+# Répertoires contenant les fichiers sources
+INPUT                  = .
+
+# Fichiers à prendre en compte
+FILE_PATTERNS          = *.c *.h
+
+# Langue de la documentation
+OUTPUT_LANGUAGE        = French
+
+# Générer documentation HTML
+GENERATE_HTML          = YES
+
+# Générer documentation LaTeX
+GENERATE_LATEX         = NO
+
+# Optimisation pour le langage C
+OPTIMIZE_OUTPUT_FOR_C  = YES
+
+# Extraire toute documentation même sans commentaire
+EXTRACT_ALL            = YES
+
+# Inclure les définitions des macros
+MACRO_EXPANSION        = YES
+
+# Afficher les fonctions dans les fichiers
+EXTRACT_STATIC         = YES
+

@@ -1,0 +1,19 @@
+# Doxyfile pour projet SDL en C
+
+PROJECT_NAME           = "Projet SDL Background"
+OUTPUT_DIRECTORY       = doc
+OUTPUT_LANGUAGE        = French
+EXTRACT_ALL            = YES
+
+INPUT                  = main.c fonction.c fonction.h
+FILE_PATTERNS          = *.c *.h
+
+RECURSIVE              = NO
+GENERATE_LATEX         = NO
+GENERATE_HTML          = YES
+
+QUIET                  = NO
+WARNINGS               = YES
+
+HAVE_DOT               = NO
+
