@@ -25,13 +25,13 @@ void initPerso(Personne *p) {
     p->lastDirection = 1; // Direction par défaut (droite)
 
     // Paramètres de physique pour le saut
-    p->vx_saut = 4;       // Vitesse horizontale pendant le saut
-    p->v_grav = 0.5;      // Gravité
-    p->v_saut = -6;       // Vitesse verticale initiale du saut (négative = vers le haut)
+    p->vx_saut = 5;       // Augmentation de la vitesse horizontale pendant le saut (était 4)
+    p->v_grav = 0.4;      // Gravité réduite pour un saut plus long (était 0.5)
+    p->v_saut = -7;       // Vitesse verticale initiale du saut plus élevée (était -6)
     p->v_y = p->v_saut;   // Vitesse verticale courante
 
     p->acceleration = 0;
-    p->vitesse = 5;       // Vitesse de déplacement horizontale
+    p->vitesse = 3.5;     // Vitesse de déplacement horizontale réduite (était 5)
 
     // Initialisation des coeurs (vies)
     p->imagec = IMG_Load("img/coeur.png");
@@ -88,13 +88,13 @@ void initPerso2(Personne *p) {
     p->lastDirection = 1; // Direction par défaut (droite)
 
     // Paramètres de physique pour le saut
-    p->vx_saut = 4;       // Vitesse horizontale pendant le saut
-    p->v_grav = 0.5;      // Gravité
-    p->v_saut = -6;       // Vitesse verticale initiale du saut (négative = vers le haut)
+    p->vx_saut = 5;       // Augmentation de la vitesse horizontale pendant le saut (était 4)
+    p->v_grav = 0.4;      // Gravité réduite pour un saut plus long (était 0.5)
+    p->v_saut = -7;       // Vitesse verticale initiale du saut plus élevée (était -6)
     p->v_y = p->v_saut;   // Vitesse verticale courante
 
     p->acceleration = 0;
-    p->vitesse = 5;       // Vitesse de déplacement horizontale
+    p->vitesse = 3.5;     // Vitesse de déplacement horizontale réduite (était 5)
 
     // Initialisation des coeurs (vies)
     p->imagec = IMG_Load("img/coeur.png");
@@ -151,7 +151,11 @@ void afficherPerso(Personne p, SDL_Surface *screen) {
 
 // Déplacement du personnage
 void deplacerPerso(Personne *p, Uint32 dt) {
-    float deplacement = 0.5 * p->acceleration * (dt) * (dt) + p->vitesse * dt;
+    // Normalisation du deltaTime pour éviter les grands sauts avec des valeurs élevées
+    float deltaSeconds = dt / 1000.0f; // Conversion en secondes
+    if (deltaSeconds > 0.1f) deltaSeconds = 0.1f; // Plafond pour éviter les bonds en cas de lag
+    
+    float deplacement = p->vitesse * deltaSeconds * 60.0f; // Normaliser pour 60 FPS
     
     switch (p->direction) {
         case 1: // Droite
