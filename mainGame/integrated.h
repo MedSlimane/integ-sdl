@@ -7,6 +7,12 @@
 #include <SDL/SDL_mixer.h>
 #include <math.h>
 
+// Constantes pour la caméra et la minicarte
+#define CAMERA_SEUIL_X 200
+#define MINIMAP_WIDTH 200
+#define MINIMAP_HEIGHT 150
+#define MINIMAP_PADDING 10
+
 // Structure pour le texte
 typedef struct {
     TTF_Font *font;
@@ -149,6 +155,15 @@ typedef struct {
     int afficherCommentJouer;
 } Background;
 
+// Structure pour la minicarte
+typedef struct {
+    SDL_Surface *surface;      // Surface pour rendre la minicarte
+    SDL_Surface *player_icon;  // Icône du joueur sur la minicarte
+    SDL_Rect position;         // Position de la minicarte à l'écran
+    float scale_x;             // Facteur d'échelle en X
+    float scale_y;             // Facteur d'échelle en Y
+} Minimap;
+
 // Configuration du défilement de la caméra
 #define CAMERA_SEUIL_X 350  // Distance par rapport au bord de l'écran avant que la caméra commence à défiler
 #define CAMERA_SEUIL_Y 250  // Distance par rapport au bord de l'écran avant que la caméra commence à défiler verticalement
@@ -216,5 +231,12 @@ void animer(enigmetf *e);
 void free_Surface_enigme(enigmetf *e);
 void animer_background(enigmetf *e);
 int jouerEnigme(SDL_Surface *ecran); // Fonction principale qui retourne 1 si gagné, 0 si perdu
+
+// Fonctions pour la minicarte
+void initMinimap(Minimap *minimap, int screenWidth, int screenHeight);
+void updateMinimap(Minimap *minimap, Background *bg, Personne p, int bgX, int bgY);
+void updateMinimapDuo(Minimap *minimap, Background *bg, Personne p1, Personne p2, int bgX, int bgY);
+void afficherMinimap(Minimap minimap, SDL_Surface *screen);
+void freeMinimap(Minimap *minimap);
 
 #endif
