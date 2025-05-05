@@ -487,7 +487,8 @@ void handleEvents(SDL_Event event, Personne *perso, int *running, int *bgX, int 
                 }
                 break;
             case SDLK_ESCAPE:
-                *running = 0; // Quitter le jeu
+                // Lancer le menu des scores au lieu de quitter directement
+                scoreMenuLoop(SDL_GetVideoSurface(), perso->Vscore);
                 break;
             default:
                 break;
@@ -541,7 +542,12 @@ void handleEventsDuo(SDL_Event event, Personne *perso1, Personne *perso2, int *r
                 break;
 
             case SDLK_ESCAPE:
-                *running = 0; // Quitter le jeu
+                // Lancer le menu des scores avec le score du joueur ayant le meilleur score
+                if (perso1->Vscore > perso2->Vscore) {
+                    scoreMenuLoop(SDL_GetVideoSurface(), perso1->Vscore);
+                } else {
+                    scoreMenuLoop(SDL_GetVideoSurface(), perso2->Vscore);
+                }
                 break;
             default:
                 break;
@@ -629,6 +635,9 @@ void jouerModeSolo(SDL_Surface *screen) {
             deplacerPerso(&perso, deltaTime);
             animerPerso(&perso);
             
+            // Incrémenter le score lorsque le joueur se déplace
+            incrementScore(&perso, deltaTime);
+            
             // Logique du seuil pour le défilement de la caméra
             if (perso.position.x > (screen->w - CAMERA_SEUIL_X)) {
                 bgX += perso.position.x - (screen->w - CAMERA_SEUIL_X);
@@ -646,6 +655,11 @@ void jouerModeSolo(SDL_Surface *screen) {
         
         // Gestion du saut du personnage
         saut_Personnage(&perso, deltaTime, perso.posX_absolue, sol_y);
+        
+        // Si le joueur est en train de sauter, incrémenter également le score
+        if (perso.up == 1) {
+            incrementScore(&perso, deltaTime);
+        }
         
         // Mise à jour des ennemis
         for (int i = 0; i < nbEnnemis; i++) {
@@ -876,6 +890,9 @@ void jouerModeDuo(SDL_Surface *screen) {
             deplacerPerso(&perso1, deltaTime);
             animerPerso(&perso1);
             
+            // Incrémenter le score lorsque le joueur 1 se déplace
+            incrementScore(&perso1, deltaTime);
+            
             // Logique du seuil pour joueur 1
             // Si le joueur dépasse le seuil à droite, on défile le fond
             if (perso1.position.x > (ecranGauche.w - CAMERA_SEUIL_X)) {
@@ -896,6 +913,9 @@ void jouerModeDuo(SDL_Surface *screen) {
         if (perso2.direction != 0) {
             deplacerPerso(&perso2, deltaTime);
             animerPerso(&perso2);
+            
+            // Incrémenter le score lorsque le joueur 2 se déplace
+            incrementScore(&perso2, deltaTime);
             
             // Logique du seuil pour joueur 2
             // Si le joueur dépasse le seuil à droite, on défile le fond

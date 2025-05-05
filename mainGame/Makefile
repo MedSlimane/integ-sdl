@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -Wall -Wextra -g
 SDLFLAGS = `sdl-config --cflags --libs` -lSDL_image -lSDL_ttf -lSDL_mixer -lm
 
-SRC = main.c integrated.c menu.c
+SRC = main.c integrated.c menu.c score.c
 OBJ = $(SRC:.c=.o)
 EXE = game
 

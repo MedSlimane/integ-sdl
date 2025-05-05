@@ -50,6 +50,28 @@ typedef struct {
     int is_fullscreen;
 } SettingsMenu;
 
+// Structure pour le menu des scores
+typedef struct {
+    SDL_Surface *background;
+    SDL_Surface *button_validate;
+    SDL_Surface *button_return;
+    SDL_Surface *button_quit;
+    SDL_Rect zone_input;
+    SDL_Rect pos_button_validate;
+    SDL_Rect pos_button_return;
+    SDL_Rect pos_button_quit;
+    int is_hovering_validate;
+    int is_hovering_return;
+    int is_hovering_quit;
+    TTF_Font *font;
+    SDL_Color textColor;
+    char player_name[100];
+    Mix_Chunk *click_sound;
+    Mix_Music *validation_music;
+} ScoreMenu;
+
+typedef enum { MENU_INPUT, MENU_SCORES_DISPLAY } ScoreMenuState;
+
 // Structure pour le personnage
 typedef struct {
     SDL_Surface *imagePers;
@@ -174,6 +196,16 @@ void decreaseVolume(SettingsMenu *menu);
 void toggleFullscreen(SDL_Surface **screen, SettingsMenu *menu);
 void settingsMenuLoop(SDL_Surface **screen, SettingsMenu *menu);
 SDL_Surface* drawSettingsText(const char *text, TTF_Font *font, SDL_Color textColor);
+
+// Fonctions pour la gestion des scores
+void initScoreMenu(ScoreMenu *menu);
+void cleanupScoreMenu(ScoreMenu *menu);
+void handleScoreMenuEvents(SDL_Event event, ScoreMenu *menu, ScoreMenuState *state, int *quit, int score);
+void displayScoreMenu(SDL_Surface *screen, ScoreMenu *menu, ScoreMenuState state, int score);
+void saveScore(const char *player_name, int score);
+void displayScores(SDL_Surface *screen, ScoreMenu *menu);
+void incrementScore(Personne *p, Uint32 dt);
+int scoreMenuLoop(SDL_Surface *screen, int final_score);
 
 // Fonctions pour l'énigme
 void InitEnigme(enigmetf *e, char nomfichier[]);
