@@ -1070,7 +1070,8 @@ void jouerModeDuo(SDL_Surface *screen) {
         afficherCoeurs(coeurs1, screen, bgX1, bgY1);
         
         // Mise à jour et affichage de la minicarte pour joueur 1
-        updateMinimap(&minimap1, &background1, perso1, bgX1, bgY1);
+        // En mode duo, nous utilisons updateMinimapDuo pour afficher les deux joueurs sur chaque minimap
+        updateMinimapDuo(&minimap1, &background1, perso1, perso2, bgX1, bgY1);
         afficherMinimap(minimap1, screen);
         
         // Affichage du joueur 1
@@ -1108,7 +1109,8 @@ void jouerModeDuo(SDL_Surface *screen) {
         afficherCoeurs(coeurs2, screen, bgX2, bgY2);
         
         // Mise à jour et affichage de la minicarte pour joueur 2
-        updateMinimap(&minimap2, &background2, perso2, bgX2, bgY2);
+        // Ici aussi, nous utilisons updateMinimapDuo pour afficher les deux joueurs
+        updateMinimapDuo(&minimap2, &background2, perso1, perso2, bgX2, bgY2);
         afficherMinimap(minimap2, screen);
         
         // Affichage du joueur 2
@@ -2078,47 +2080,62 @@ void initMinimap(Minimap *minimap, int screenWidth, int screenHeight) {
 // Mise à jour de la minicarte pour le mode solo
 void updateMinimap(Minimap *minimap, Background *bg, Personne p, int bgX, int bgY) {
     // Calcul des facteurs d'échelle en fonction de la taille du monde
-    // Supposons que la largeur du monde est la largeur de l'image de fond
     minimap->scale_x = (float)MINIMAP_WIDTH / bg->img->w;
     minimap->scale_y = (float)MINIMAP_HEIGHT / bg->img->h;
     
-    // Créer une version réduite du fond
-    SDL_Surface *scaled_bg = SDL_CreateRGBSurface(SDL_SWSURFACE, MINIMAP_WIDTH, MINIMAP_HEIGHT, 32,
-                                                0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
-    
-    // Remplir la minicarte avec une couleur de fond sombre
+    // Remplir la minicarte avec une couleur de fond sombre (au cas où l'image ne se charge pas correctement)
     SDL_FillRect(minimap->surface, NULL, SDL_MapRGB(minimap->surface->format, 20, 20, 50));
     
-    // Dessiner une version réduite du fond visible actuellement
-    SDL_Rect src = {bgX, bgY, bg->img->w, bg->img->h};
-    SDL_Rect dst = {0, 0, MINIMAP_WIDTH, MINIMAP_HEIGHT};
-    SDL_SoftStretch(bg->img, &src, scaled_bg, NULL);
-    SDL_BlitSurface(scaled_bg, NULL, minimap->surface, NULL);
+    // Créer une copie réduite du fond pour la minicarte
+    SDL_Surface *scaled_bg = SDL_CreateRGBSurface(SDL_SWSURFACE, MINIMAP_WIDTH, MINIMAP_HEIGHT, 32,
+                                                0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+    if (!scaled_bg) {
+        printf("Erreur lors de la création de la surface réduite pour la minimap: %s\n", SDL_GetError());
+        return;
+    }
+    
+    // Calcul de la portion du fond à afficher dans la minicarte
+    int bgWidth = bg->img->w;
+    int bgHeight = bg->img->h;
+    
+    // Normaliser la position de la caméra pour l'effet de défilement infini
+    int normalizedX = bgX % bgWidth;
+    if (normalizedX < 0) normalizedX += bgWidth;
+    
+    // Correction: Utiliser NULL comme source pour copier l'image entière du fond
+    // puis redimensionner à la taille de la minicarte
+    SDL_BlitSurface(bg->img, NULL, scaled_bg, NULL);
     
     // Calculer la position du joueur sur la minicarte
-    // Position X = (position absolue * facteur d'échelle)
-    // Position Y = (position absolue * facteur d'échelle)
     SDL_Rect player_pos = {
-        (int)(p.posX_absolue * minimap->scale_x),
-        (int)(p.posY_absolue * minimap->scale_y),
+        (int)((p.posX_absolue) * minimap->scale_x),
+        (int)((p.posY_absolue) * minimap->scale_y),
         minimap->player_icon->w,
         minimap->player_icon->h
     };
+    
+    // Assurer que l'icône du joueur reste dans les limites de la minicarte
+    if (player_pos.x < 0) player_pos.x = 0;
+    if (player_pos.y < 0) player_pos.y = 0;
+    if (player_pos.x > MINIMAP_WIDTH - minimap->player_icon->w) 
+        player_pos.x = MINIMAP_WIDTH - minimap->player_icon->w;
+    if (player_pos.y > MINIMAP_HEIGHT - minimap->player_icon->h) 
+        player_pos.y = MINIMAP_HEIGHT - minimap->player_icon->h;
+    
+    // Appliquer le fond redimensionné à la minicarte
+    SDL_BlitSurface(scaled_bg, NULL, minimap->surface, NULL);
     
     // Dessiner l'icône du joueur sur la minicarte
     SDL_BlitSurface(minimap->player_icon, NULL, minimap->surface, &player_pos);
     
     // Ajouter un cadre autour de la minicarte
-    SDL_Rect border = {0, 0, MINIMAP_WIDTH, MINIMAP_HEIGHT};
-    // Dessiner les lignes horizontales du cadre
     SDL_Rect top_line = {0, 0, MINIMAP_WIDTH, 2};
     SDL_Rect bottom_line = {0, MINIMAP_HEIGHT - 2, MINIMAP_WIDTH, 2};
-    SDL_FillRect(minimap->surface, &top_line, SDL_MapRGB(minimap->surface->format, 255, 255, 255));
-    SDL_FillRect(minimap->surface, &bottom_line, SDL_MapRGB(minimap->surface->format, 255, 255, 255));
-    
-    // Dessiner les lignes verticales du cadre
     SDL_Rect left_line = {0, 0, 2, MINIMAP_HEIGHT};
     SDL_Rect right_line = {MINIMAP_WIDTH - 2, 0, 2, MINIMAP_HEIGHT};
+    
+    SDL_FillRect(minimap->surface, &top_line, SDL_MapRGB(minimap->surface->format, 255, 255, 255));
+    SDL_FillRect(minimap->surface, &bottom_line, SDL_MapRGB(minimap->surface->format, 255, 255, 255));
     SDL_FillRect(minimap->surface, &left_line, SDL_MapRGB(minimap->surface->format, 255, 255, 255));
     SDL_FillRect(minimap->surface, &right_line, SDL_MapRGB(minimap->surface->format, 255, 255, 255));
     
@@ -2135,14 +2152,19 @@ void updateMinimapDuo(Minimap *minimap, Background *bg, Personne p1, Personne p2
     // Créer une version réduite du fond
     SDL_Surface *scaled_bg = SDL_CreateRGBSurface(SDL_SWSURFACE, MINIMAP_WIDTH, MINIMAP_HEIGHT, 32,
                                                 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+    if (!scaled_bg) {
+        printf("Erreur lors de la création de la surface réduite pour la minicarte: %s\n", SDL_GetError());
+        return;
+    }
     
     // Remplir la minicarte avec une couleur de fond sombre
     SDL_FillRect(minimap->surface, NULL, SDL_MapRGB(minimap->surface->format, 20, 20, 50));
     
-    // Dessiner une version réduite du fond visible actuellement
-    SDL_Rect src = {bgX, bgY, bg->img->w, bg->img->h};
-    SDL_Rect dst = {0, 0, MINIMAP_WIDTH, MINIMAP_HEIGHT};
-    SDL_SoftStretch(bg->img, &src, scaled_bg, NULL);
+    // Correction: Utiliser NULL comme source pour copier l'image entière du fond
+    // puis redimensionner à la taille de la minicarte
+    SDL_BlitSurface(bg->img, NULL, scaled_bg, NULL);
+    
+    // Appliquer le fond redimensionné à la minicarte
     SDL_BlitSurface(scaled_bg, NULL, minimap->surface, NULL);
     
     // Calculer la position du joueur 1 sur la minicarte
@@ -2175,11 +2197,10 @@ void updateMinimapDuo(Minimap *minimap, Background *bg, Personne p1, Personne p2
     // Ajouter un cadre autour de la minicarte
     SDL_Rect top_line = {0, 0, MINIMAP_WIDTH, 2};
     SDL_Rect bottom_line = {0, MINIMAP_HEIGHT - 2, MINIMAP_WIDTH, 2};
-    SDL_FillRect(minimap->surface, &top_line, SDL_MapRGB(minimap->surface->format, 255, 255, 255));
-    SDL_FillRect(minimap->surface, &bottom_line, SDL_MapRGB(minimap->surface->format, 255, 255, 255));
-    
     SDL_Rect left_line = {0, 0, 2, MINIMAP_HEIGHT};
     SDL_Rect right_line = {MINIMAP_WIDTH - 2, 0, 2, MINIMAP_HEIGHT};
+    SDL_FillRect(minimap->surface, &top_line, SDL_MapRGB(minimap->surface->format, 255, 255, 255));
+    SDL_FillRect(minimap->surface, &bottom_line, SDL_MapRGB(minimap->surface->format, 255, 255, 255));
     SDL_FillRect(minimap->surface, &left_line, SDL_MapRGB(minimap->surface->format, 255, 255, 255));
     SDL_FillRect(minimap->surface, &right_line, SDL_MapRGB(minimap->surface->format, 255, 255, 255));
     
